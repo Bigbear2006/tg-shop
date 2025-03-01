@@ -1,0 +1,50 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class User(AbstractUser):
+    tg_id = models.PositiveBigIntegerField(verbose_name='Телеграм ID')
+
+    REQUIRED_FIELDS = ['email', 'tg_id']
+
+    class Meta:
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
+
+
+class Category(models.Model):
+    title = models.CharField(verbose_name='Название', max_length=255)
+    parent_category = models.ForeignKey(
+        'self', models.SET_NULL,
+        'subcategories',
+        null=True,
+        blank=True,
+        verbose_name='Главная категория'
+    )
+    objects: models.Manager
+
+    class Meta:
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+
+class Product(models.Model):
+    title = models.CharField(verbose_name='Название', max_length=255)
+    description = models.TextField(verbose_name='Описание')
+    price = models.DecimalField(verbose_name='Цена', max_digits=9, decimal_places=2)
+    image = models.ImageField(verbose_name='Фото', upload_to='products')
+    image_tg_id = models.TextField(verbose_name='ID фото в телеграм', null=True, blank=True)
+    category = models.ForeignKey(Category, models.CASCADE, 'products', verbose_name='Категория')
+    objects: models.Manager
+
+    class Meta:
+        verbose_name = 'Товар'
+        verbose_name_plural = 'Товары'
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
