@@ -4,6 +4,7 @@ from aiogram.enums import ChatMemberStatus
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
+from bot.keyboards.inline import subscribe_chats_kb
 from bot.settings import settings
 
 
@@ -14,7 +15,8 @@ class IsChatMember(BaseFilter):
             if member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED):
                 await msg.answer(
                     f'Привет, {msg.from_user.full_name}!\n'
-                    f'Чтобы использовать бота надо подписаться на канал.'
+                    f'Чтобы использовать бота надо подписаться на канал.',
+                    reply_parameters=subscribe_chats_kb,
                 )
                 return False
 

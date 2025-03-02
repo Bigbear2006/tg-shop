@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import Dispatcher, Bot
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 
 from bot.settings import settings
 
@@ -14,5 +14,5 @@ logging.basicConfig(
 logger = logging.getLogger('bot')
 
 bot = Bot(settings.BOT_TOKEN)
-storage = MemoryStorage()
+storage = RedisStorage.from_url(settings.REDIS_URL)
 dp = Dispatcher(storage=storage)

@@ -189,22 +189,28 @@ async def display_product(query: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text='Добавить в корзину', callback_data=f'add_to_cart_{product_id}')]
     ])
 
-    product_message: Message = await state.get_value('product_message')
-    if product_message:
+    product_message_id: int = await state.get_value('product_message_id')
+    if product_message_id:
         try:
-            product_message = await product_message.edit_media(
-                InputMediaPhoto(media=media, caption=caption),
+            product_message = await query.bot.edit_message_media(
+                media=InputMediaPhoto(media=media, caption=caption),
+                business_connection_id=query.message.business_connection_id,
+                chat_id=query.message.chat.id,
+                message_id=product_message_id,
                 reply_markup=kb
             )
         except TelegramBadRequest:
-            pass
+            return
     else:
-        product_message = await query.message.reply_photo(
-            media,
+        product_message = await query.bot.send_photo(
+            chat_id=query.message.chat.id,
+            photo=media,
+            business_connection_id=query.message.business_connection_id,
             caption=caption,
             reply_markup=kb,
+            reply_to_message_id=query.message.message_id
         )
-    await state.update_data({'product_message': product_message})
+    await state.update_data({'product_message_id': product_message.message_id})
 
     if not product.image_tg_id:
         product.image_tg_id = product_message.photo[0].file_id
@@ -221,9 +227,10 @@ async def add_to_cart(query: CallbackQuery, state: FSMContext):
             f'during the extracting product_id from {query.data}: {e}'
         )
 
+    product = await Product.objects.aget(pk=product_id)
     await state.update_data({'product_id': product_id})
     await state.set_state(CatalogState.count)
-    await query.message.answer('Укажите количество')
+    await query.message.answer(f'Сколько штук {product.title} вы хотите купить?')
 
 
 @router.message(StateFilter(CatalogState.count))
@@ -233,13 +240,15 @@ async def set_product_count(msg: Message, state: FSMContext):
     except Exception:
         return await msg.answer('Пожалуйста, введите целое положительное число.')
 
+    if count <= 0:
+        return await msg.answer('Пожалуйста, введите целое положительное число.')
+
     data = await state.get_data()
     product_id = data.get('product_id')
     cart = data.get('cart', {})
 
-    if product_id not in cart:
-        cart.update({product_id: count})
-        await state.update_data({'cart': cart})
+    cart.update({product_id: count})
+    await state.update_data({'cart': cart})
 
     product = await Product.objects.aget(pk=product_id)
     await state.set_state(None)
@@ -253,6 +262,6 @@ async def set_product_count(msg: Message, state: FSMContext):
 # async def confirm_product_addition(msg: Message, state: FSMContext):
 
 
-@router.callback_query()
-async def default(query: CallbackQuery):
-    print(query.data)
+# @router.callback_query()
+# async def default(query: CallbackQuery):
+#     print(query.data)
