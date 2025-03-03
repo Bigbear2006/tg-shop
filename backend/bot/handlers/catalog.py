@@ -4,12 +4,13 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, FSInputFile, InlineKeyboardButton, \
     InputMediaPhoto
-from asgiref.sync import sync_to_async
+from django.db.models import Count
 
 from bot.filters import IsChatMember
-from bot.keyboards.utils import keyboard_from_queryset
+from bot.keyboards.inline import yes_no_kb
+from bot.keyboards.utils import get_categories_root_keyboard, get_products_keyboard, \
+    get_categories_keyboard
 from bot.loader import logger
-from bot.settings import settings
 from bot.states import CatalogState
 from shop.models import Category, Product
 
@@ -19,85 +20,47 @@ router.message.filter(IsChatMember())
 
 @router.message(Command('catalog'))
 @router.message(F.text == 'Каталог')
-async def display_catalog(msg: Message, state: FSMContext):
-    page = 1
-    total_count = await Category.objects.acount()
-    total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
-    categories = Category.objects.filter(parent_category=None)[:settings.PAGE_SIZE]
-
+async def display_catalog(msg: Message):
     await msg.answer(
         'Все категории',
-        reply_markup=await keyboard_from_queryset(
-            categories,
-            prefix='category',
-            previous_button_data='previous_category' if page > 1 else None,
-            next_button_data='next_category' if page < total_pages else None,
-        )
+        reply_markup=await get_categories_root_keyboard()
     )
 
 
-@router.callback_query(F.data.in_(('previous_category', 'next_category')))
-async def category_previous_page(query: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data.in_(('catalog_previous', 'catalog_next')))
+async def change_page(query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     page = data.get('page', 1)
     category_id = data.get('category_id')
 
-    if query.data == 'previous_category':
+    if query.data == 'catalog_previous':
         page -= 1
     else:
         page += 1
     await state.update_data(page=page)
-    print('page and category_id = ', page, category_id)
-
-    total_count = await Category.objects.filter(parent_category=category_id).acount()
-    total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
-
-    start, end = (page - 1) * settings.PAGE_SIZE, page * settings.PAGE_SIZE
-    subcategories = Category.objects.filter(parent_category=category_id)[start:end]
-    await sync_to_async(subcategories._fetch_all)()
 
     if not category_id:
         return await query.message.edit_text(
-            f'Все категории',
-            reply_markup=await keyboard_from_queryset(
-                subcategories,
-                prefix='category',
-                previous_button_data='previous_category' if page > 1 else None,
-                next_button_data='next_category' if page < total_pages else None,
-            )
+            'Все категории',
+            reply_markup=await get_categories_root_keyboard(page)
         )
 
-    category = await Category.objects.prefetch_related('parent_category').aget(pk=category_id)
+    category = (
+        await Category.objects
+        .annotate(subcategories_count=Count('subcategories'))
+        .select_related('parent_category')
+        .aget(pk=category_id)
+    )
 
-    if not subcategories:
-        total_count = await Product.objects.filter(category=category).acount()
-        total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
-        start, end = (page - 1) * settings.PAGE_SIZE, page * settings.PAGE_SIZE
-        products = Product.objects.filter(category=category)[start:end]
-
+    if category.subcategories_count == 0:
         return await query.message.edit_text(
             f'Товары категории {category}',
-            reply_markup=await keyboard_from_queryset(
-                products,
-                prefix='product',
-                back_button_data=f'category_{category.parent_category.pk}'
-                if category.parent_category else 'categories_root',
-                previous_button_data='previous_category' if page > 1 else None,
-                next_button_data='next_category' if page < total_pages else None,
-            )
+            reply_markup=await get_products_keyboard(category, page)
         )
 
     await query.message.edit_text(
         f'Категория {category}',
-        reply_markup=await keyboard_from_queryset(
-            subcategories,
-            prefix='category',
-            back_button_data=
-            f'category_{category.parent_category.pk}'
-            if category.parent_category else 'categories_root',
-            previous_button_data='previous_category' if page > 1 else None,
-            next_button_data='next_category' if page < total_pages else None,
-        )
+        reply_markup=await get_categories_keyboard(category, page)
     )
 
 
@@ -110,65 +73,35 @@ async def expand_category(query: CallbackQuery, state: FSMContext):
             f'An exception occurred '
             f'during the extracting category_id from {query.data}: {e}'
         )
+
     await state.update_data(category_id=category_id)
-    # page = await state.get_value('page', 1)
-    page = 1
-    await state.update_data(page=page)
+    await state.update_data(page=1)
 
-    total_count = await Category.objects.filter(parent_category=category_id).acount()
-    total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
-    start, end = (page - 1) * settings.PAGE_SIZE, page * settings.PAGE_SIZE
+    category = (
+        await Category.objects
+        .annotate(subcategories_count=Count('subcategories'))
+        .select_related('parent_category')
+        .aget(pk=category_id)
+    )
 
-    category = await Category.objects.prefetch_related('parent_category').aget(pk=category_id)
-    subcategories = Category.objects.filter(parent_category_id=category_id)[start:end]
-    await sync_to_async(subcategories._fetch_all)()
-
-    if not subcategories:
-        total_count = await Product.objects.filter(category=category).acount()
-        total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
-        products = Product.objects.filter(category=category)[:settings.PAGE_SIZE]
-
+    if category.subcategories_count == 0:
         return await query.message.edit_text(
             f'Товары категории {category}',
-            reply_markup=await keyboard_from_queryset(
-                products,
-                prefix='product',
-                back_button_data=f'category_{category.parent_category.pk}'
-                if category.parent_category else 'categories_root',
-                next_button_data='next_category' if total_pages > 1 else None,
-            )
+            reply_markup=await get_products_keyboard(category)
         )
 
     await query.message.edit_text(
         f'Категория {category}',
-        reply_markup=await keyboard_from_queryset(
-            subcategories,
-            prefix='category',
-            back_button_data=
-            f'category_{category.parent_category.pk}'
-            if category.parent_category else 'categories_root',
-            previous_button_data='previous_category' if page > 1 else None,
-            next_button_data='next_category' if page < total_pages else None,
-        )
+        reply_markup=await get_categories_keyboard(category)
     )
 
 
 @router.callback_query(F.data == 'categories_root')
-async def display_catalog(query: CallbackQuery, state: FSMContext):
-    page = 1
-    total_count = await Category.objects.acount()
-    total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
-    categories = Category.objects.filter(parent_category=None)[:settings.PAGE_SIZE]
-
+async def display_categories_root(query: CallbackQuery, state: FSMContext):
     await state.update_data(category_id=None)
     await query.message.edit_text(
         'Все категории',
-        reply_markup=await keyboard_from_queryset(
-            categories,
-            prefix='category',
-            previous_button_data='previous_category' if page > 1 else None,
-            next_button_data='next_category' if page < total_pages else None,
-        )
+        reply_markup=await get_categories_root_keyboard()
     )
 
 
@@ -243,24 +176,49 @@ async def set_product_count(msg: Message, state: FSMContext):
     if count <= 0:
         return await msg.answer('Пожалуйста, введите целое положительное число.')
 
+    product = await Product.objects.aget(
+        pk=await state.get_value('product_id'),
+    )
+
+    await state.update_data(count=count)
+    await state.set_state(CatalogState.confirmation)
+    await msg.answer(
+        f'Вы точно хотите добавить в корзину {product.title} ({count} шт.)?',
+        reply_markup=yes_no_kb,
+    )
+
+
+@router.callback_query(F.data == 'yes', StateFilter(CatalogState.confirmation))
+async def confirm_product_addition(query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     product_id = data.get('product_id')
+    count = data.get('count')
     cart = data.get('cart', {})
+    print(product_id, cart)
 
     cart.update({product_id: count})
     await state.update_data({'cart': cart})
 
     product = await Product.objects.aget(pk=product_id)
     await state.set_state(None)
-    await msg.answer(
+    await query.message.answer(
         f'Вы добавили в корзину {product.title} ({count} шт.)\n'
         f'Перейти в корзину - /cart'
     )
 
 
-# @router.message(StateFilter(CatalogState.confirmation))
-# async def confirm_product_addition(msg: Message, state: FSMContext):
+@router.callback_query(F.data == 'no', StateFilter(CatalogState.confirmation))
+async def cancel_product_addition(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    product_id = data.get('product_id')
+    count = data.get('count')
 
+    product = await Product.objects.aget(pk=product_id)
+    await state.set_state(None)
+    await query.message.answer(
+        f'Добавление в корзину товара {product.title} ({count} шт.) отменено\n'
+        f'Перейти в корзину - /cart'
+    )
 
 # @router.callback_query()
 # async def default(query: CallbackQuery):

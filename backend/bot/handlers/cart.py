@@ -116,24 +116,23 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     data = await state.get_data()
     cart = data.get('cart')
     buy_whole_cart = data.get('buy_whole_cart')
-    print(cart)
+    test_card_info = 'Для оплаты используйте данные тестовой карты\n1111 1111 1111 1026, 12/22, 000'
+
     if buy_whole_cart:
         amount = sum([
             int(product.price * 100) * cart.get(str(product.pk))
             async for product in Product.objects.filter(pk__in=cart.keys())
         ])
-        print(amount)
         await state.set_state(None)
-        await msg.bot.send_invoice(
+        return await msg.bot.send_invoice(
             msg.chat.id,
             'Покупка',
-            f'Покупка всей корзины',
+            f'Покупка всей корзины.\n{test_card_info}',
             f'whole_cart',
             settings.CURRENCY,
             [LabeledPrice(label=settings.CURRENCY, amount=amount)],
             provider_token=settings.PROVIDER_TOKEN,
         )
-        return
 
     product_id = data.get('product_id')
     product = await Product.objects.aget(pk=product_id)
@@ -144,7 +143,7 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     await msg.bot.send_invoice(
         msg.chat.id,
         'Покупка',
-        f'Покупка {product.title} ({product_count} шт.)',
+        f'Покупка {product.title} ({product_count} шт.).\n{test_card_info}',
         f'product_{product_id}',
         settings.CURRENCY,
         [LabeledPrice(label=settings.CURRENCY, amount=amount)],
@@ -208,7 +207,7 @@ async def on_successful_payment(msg: Message, state: FSMContext):
         wb.save(settings.ORDERS_FILE)
         await msg.answer(
             f'Поздравляем c покупкой {product.title} ({product_count} шт.) '
-            f'на сумму: {msg.successful_payment.total_amount / 100:.2f} ₽!'
+            f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!'
         )
 
 

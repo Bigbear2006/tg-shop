@@ -37,8 +37,9 @@ async def main():
 
     init_excel()
 
-    from bot.handlers import commands, catalog, cart
-    dp.include_routers(commands.router, catalog.router, cart.router)
+    from bot.handlers import commands, catalog, cart, inline
+    dp.include_routers(commands.router, catalog.router, cart.router, inline.router)
+
     logger.info('Starting bot...')
 
     await bot.delete_webhook(drop_pending_updates=True)

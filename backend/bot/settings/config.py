@@ -13,6 +13,6 @@ class Settings:
     REDIS_URL: str = field(default_factory=lambda: env('REDIS_URL'))
 
     CURRENCY: str = field(default='RUB')
-    PAGE_SIZE: int = field(default=2)
+    PAGE_SIZE: int = field(default=1)
     ORDERS_FILE: str = field(default='orders.xlsx')
     SUBSCRIBE_CHATS: list = field(default_factory=lambda: ['-1001708499155'])
