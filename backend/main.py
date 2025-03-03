@@ -3,6 +3,7 @@ import os
 
 import django
 import openpyxl
+from aiogram import F
 from aiogram.types import BotCommand
 
 from bot.loader import bot, dp, logger
@@ -39,8 +40,7 @@ async def main():
 
     from bot.handlers import commands, catalog, cart, inline
     dp.include_routers(commands.router, catalog.router, cart.router, inline.router)
-
-    logger.info('Starting bot...')
+    dp.message.filter(F.chat.type == 'private')
 
     await bot.delete_webhook(drop_pending_updates=True)
     await bot.set_my_commands([
@@ -48,6 +48,8 @@ async def main():
         BotCommand(command='/catalog', description='Каталог'),
         BotCommand(command='/cart', description='Корзина'),
     ])
+
+    logger.info('Starting bot...')
     await dp.start_polling(bot)
 
 

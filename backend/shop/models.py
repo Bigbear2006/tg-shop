@@ -20,9 +20,19 @@ class Client(models.Model):
     class Meta:
         verbose_name = 'Клиент'
         verbose_name_plural = 'Клиенты'
+        ordering = ['-created_at']
 
     def __str__(self):
-        return self.username
+        return f'@{self.username}'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'username': self.username,
+            'is_premium': self.is_premium,
+        }
 
 
 class Category(models.Model):
@@ -61,3 +71,16 @@ class Product(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Dispatch(models.Model):
+    text = models.TextField(verbose_name='Текст')
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects: models.Manager
+
+    def __str__(self):
+        return self.text[:50]
+
+    class Meta:
+        verbose_name = 'Рассылка'
+        verbose_name_plural = 'Рассылки'

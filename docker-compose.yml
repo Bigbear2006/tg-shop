@@ -1,0 +1,80 @@
+version: "3.3"
+
+services:
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+
+  db:
+    image: postgres:17.4
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    env_file:
+      - .env
+
+  backend:
+    build:
+      context: backend
+    entrypoint: /app/entrypoint.sh
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db
+
+  bot:
+    build:
+      context: backend
+    command: python /app/main.py
+    restart: always
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db
+
+  celery:
+    build:
+      context: backend
+    restart: always
+    command: celery -A backend worker -l info
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      - backend
+
+  nginx:
+    build:
+      context: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./backend/static:/var/www/static
+      - ./nginx/letsencrypt:/etc/letsencrypt
+      - ./nginx/webroot:/var/www/certbot
+    depends_on:
+      - backend
+      - celery
+
+  certbot:
+    image: certbot/certbot:v3.2.0
+    volumes:
+      - ./nginx/letsencrypt:/etc/letsencrypt
+      - ./nginx/webroot:/var/www/certbot
+    depends_on:
+      - nginx
