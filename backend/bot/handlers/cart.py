@@ -19,15 +19,7 @@ router = Router()
 router.message.filter(IsChatMember())
 
 
-@router.message(Command('cart'))
-@router.message(F.text == 'Корзина')
-async def display_cart(msg: Message, state: FSMContext):
-    await state.update_data({'product_message_id': None})
-    cart = await state.get_value('cart', {})
-
-    if not cart:
-        return await msg.answer('Ваша корзина пуста.\nПерейти в каталог - /catalog')
-
+async def get_cart_keyboard(cart: dict[str, int]) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     products = Product.objects.filter(pk__in=cart.keys())
 
@@ -38,11 +30,34 @@ async def display_cart(msg: Message, state: FSMContext):
             callback_data=f'cart_product_{product.pk}',
         )
     kb.adjust(1)
+    return kb.as_markup()
 
-    await msg.answer(
+
+@router.message(Command('cart'))
+@router.message(F.text == 'Корзина')
+async def display_cart(msg: Message, state: FSMContext):
+    await state.update_data(product_message_id=None)
+    cart = await state.get_value('cart', {})
+
+    if not cart:
+        return await msg.answer('Ваша корзина пуста.\nПерейти в каталог - /catalog')
+
+    # kb = InlineKeyboardBuilder()
+    # products = Product.objects.filter(pk__in=cart.keys())
+    #
+    # kb.button(text='Оплатить всю корзину', callback_data='buy_whole_cart')
+    # async for product in products:
+    #     kb.button(
+    #         text=f'{product.title} ({cart.get(str(product.pk), 0)} шт.)',
+    #         callback_data=f'cart_product_{product.pk}',
+    #     )
+    # kb.adjust(1)
+
+    message = await msg.answer(
         'Ваша корзина',
-        reply_markup=kb.as_markup(),
+        reply_markup=await get_cart_keyboard(cart),
     )
+    await state.update_data(cart_message_id=message.message_id)
 
 
 @router.callback_query(F.data.startswith('cart_product'))
@@ -116,7 +131,7 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     data = await state.get_data()
     cart = data.get('cart')
     buy_whole_cart = data.get('buy_whole_cart')
-    test_card_info = 'Для оплаты используйте данные тестовой карты\n1111 1111 1111 1026, 12/22, 000'
+    test_card_info = 'Для оплаты используйте данные тестовой карты: 1111 1111 1111 1026, 12/22, 000'
 
     if buy_whole_cart:
         amount = sum([
@@ -158,7 +173,8 @@ async def accept_pre_checkout_query(query: PreCheckoutQuery):
 
 @router.message(F.successful_payment)
 async def on_successful_payment(msg: Message, state: FSMContext):
-    print(msg.successful_payment)
+    logger.info(f'Successful payment: {msg.successful_payment}')
+
     data = await state.get_data()
     cart = data.get('cart')
     delivery_location = data.get('delivery_location')
@@ -227,7 +243,7 @@ async def change_product_count(query: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data.startswith('delete_from_cart'))
-async def display_cart_product(query: CallbackQuery, state: FSMContext):
+async def delete_product_from_cart(query: CallbackQuery, state: FSMContext):
     try:
         product_id = int(query.data.split('_')[-1])
     except Exception as e:
@@ -236,9 +252,27 @@ async def display_cart_product(query: CallbackQuery, state: FSMContext):
             f'during the extracting product_id from {query.data}: {e}'
         )
 
-    cart: dict[str, int] = await state.get_value('cart', {})
+    data = await state.get_data()
+    cart = data.get('cart', {})
+    cart_message_id = data.get('cart_message_id')
+
     cart.pop(str(product_id), None)
     await state.update_data({'cart': cart})
 
-    product = await Product.objects.aget(pk=product_id)
-    await query.message.answer(f'Товар {product.title} удален из корзины')
+    if len(cart) == 0:
+        await query.bot.edit_message_text(
+            'Ваша корзина пуста.\nПерейти в каталог - /catalog',
+            business_connection_id=query.message.business_connection_id,
+            chat_id=query.message.chat.id,
+            message_id=cart_message_id,
+        )
+    else:
+        await query.bot.edit_message_reply_markup(
+            business_connection_id=query.message.business_connection_id,
+            chat_id=query.message.chat.id,
+            message_id=cart_message_id,
+            reply_markup=await get_cart_keyboard(cart),
+        )
+
+    await state.update_data(product_message_id=None)
+    await query.message.delete()

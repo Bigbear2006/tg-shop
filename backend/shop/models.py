@@ -3,13 +3,26 @@ from django.db import models
 
 
 class User(AbstractUser):
-    tg_id = models.PositiveBigIntegerField(verbose_name='Телеграм ID')
-
-    REQUIRED_FIELDS = ['email', 'tg_id']
-
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+
+
+class Client(models.Model):
+    id = models.PositiveBigIntegerField(verbose_name='Телеграм ID', primary_key=True)
+    first_name = models.CharField(verbose_name='Имя', max_length=255)
+    last_name = models.CharField(verbose_name='Фамилия', max_length=255, null=True, blank=True)
+    username = models.CharField(verbose_name='Ник', max_length=32)
+    is_premium = models.BooleanField(verbose_name='Есть премиум', default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    objects: models.Manager
+
+    class Meta:
+        verbose_name = 'Клиент'
+        verbose_name_plural = 'Клиенты'
+
+    def __str__(self):
+        return self.username
 
 
 class Category(models.Model):

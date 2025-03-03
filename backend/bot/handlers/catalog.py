@@ -20,7 +20,8 @@ router.message.filter(IsChatMember())
 
 @router.message(Command('catalog'))
 @router.message(F.text == 'Каталог')
-async def display_catalog(msg: Message):
+async def display_catalog(msg: Message, state: FSMContext):
+    await state.update_data(product_message_id=None, category_id=None, page=1)
     await msg.answer(
         'Все категории',
         reply_markup=await get_categories_root_keyboard()
@@ -163,7 +164,7 @@ async def add_to_cart(query: CallbackQuery, state: FSMContext):
     product = await Product.objects.aget(pk=product_id)
     await state.update_data({'product_id': product_id})
     await state.set_state(CatalogState.count)
-    await query.message.answer(f'Сколько штук {product.title} вы хотите купить?')
+    await query.message.answer(f'Сколько штук {product.title} вы хотите добавить в корзину?')
 
 
 @router.message(StateFilter(CatalogState.count))
@@ -194,7 +195,6 @@ async def confirm_product_addition(query: CallbackQuery, state: FSMContext):
     product_id = data.get('product_id')
     count = data.get('count')
     cart = data.get('cart', {})
-    print(product_id, cart)
 
     cart.update({product_id: count})
     await state.update_data({'cart': cart})

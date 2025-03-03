@@ -15,9 +15,8 @@ class IsChatMember(BaseFilter):
             if member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.KICKED):
                 await msg.answer(
                     f'Привет, {msg.from_user.full_name}!\n'
-                    f'Чтобы использовать бота надо подписаться на канал.',
-                    reply_parameters=subscribe_chats_kb,
+                    f'Чтобы использовать бота надо подписаться на наш канал и чат',
+                    reply_markup=subscribe_chats_kb,
                 )
                 return False
-
         return True
