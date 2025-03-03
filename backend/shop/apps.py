@@ -7,4 +7,4 @@ class ShopConfig(AppConfig):
     verbose_name = 'Магазин'
 
     def ready(self):
-        import shop.signals
+        pass

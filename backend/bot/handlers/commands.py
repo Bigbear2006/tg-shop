@@ -5,7 +5,6 @@ from aiogram.types import Message
 
 from bot.filters import IsChatMember
 from bot.keyboards.common import menu_kb
-from bot.keyboards.inline import subscribe_chats_kb
 from bot.loader import logger
 from shop.models import Client
 
@@ -31,7 +30,9 @@ async def start(msg: Message, state: FSMContext):
             username=msg.from_user.username,
             is_premium=msg.from_user.is_premium,
         )
-        logger.info(f'New client was created @{client.username} id={client.pk}')
+        logger.info(
+            f'New client was created @{client.username} id={client.pk}',
+        )
 
     await state.clear()
     return await msg.answer(

@@ -9,11 +9,22 @@ class User(AbstractUser):
 
 
 class Client(models.Model):
-    id = models.PositiveBigIntegerField(verbose_name='Телеграм ID', primary_key=True)
+    id = models.PositiveBigIntegerField(
+        verbose_name='Телеграм ID',
+        primary_key=True,
+    )
     first_name = models.CharField(verbose_name='Имя', max_length=255)
-    last_name = models.CharField(verbose_name='Фамилия', max_length=255, null=True, blank=True)
+    last_name = models.CharField(
+        verbose_name='Фамилия',
+        max_length=255,
+        null=True,
+        blank=True,
+    )
     username = models.CharField(verbose_name='Ник', max_length=32)
-    is_premium = models.BooleanField(verbose_name='Есть премиум', default=False)
+    is_premium = models.BooleanField(
+        verbose_name='Есть премиум',
+        default=False,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     objects: models.Manager
 
@@ -38,11 +49,12 @@ class Client(models.Model):
 class Category(models.Model):
     title = models.CharField(verbose_name='Название', max_length=255)
     parent_category = models.ForeignKey(
-        'self', models.SET_NULL,
+        'self',
+        models.SET_NULL,
         'subcategories',
         null=True,
         blank=True,
-        verbose_name='Главная категория'
+        verbose_name='Главная категория',
     )
     objects: models.Manager
 
@@ -58,10 +70,23 @@ class Category(models.Model):
 class Product(models.Model):
     title = models.CharField(verbose_name='Название', max_length=255)
     description = models.TextField(verbose_name='Описание')
-    price = models.DecimalField(verbose_name='Цена', max_digits=9, decimal_places=2)
+    price = models.DecimalField(
+        verbose_name='Цена',
+        max_digits=9,
+        decimal_places=2,
+    )
     image = models.ImageField(verbose_name='Фото', upload_to='products')
-    image_tg_id = models.TextField(verbose_name='ID фото в телеграм', null=True, blank=True)
-    category = models.ForeignKey(Category, models.CASCADE, 'products', verbose_name='Категория')
+    image_tg_id = models.TextField(
+        verbose_name='ID фото в телеграм',
+        null=True,
+        blank=True,
+    )
+    category = models.ForeignKey(
+        Category,
+        models.CASCADE,
+        'products',
+        verbose_name='Категория',
+    )
     objects: models.Manager
 
     class Meta:

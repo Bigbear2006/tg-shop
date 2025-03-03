@@ -1,18 +1,18 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from django.db.models import QuerySet, Model
+from django.db.models import Model, QuerySet
 
 from bot.settings import settings
-from shop.models import Product, Category
+from shop.models import Category, Product
 
 
 async def keyboard_from_queryset(
-        queryset: QuerySet,
-        *,
-        prefix: str,
-        back_button_data: str = None,
-        previous_button_data: str = None,
-        next_button_data: str = None,
+    queryset: QuerySet,
+    *,
+    prefix: str,
+    back_button_data: str = None,
+    previous_button_data: str = None,
+    next_button_data: str = None,
 ) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
 
@@ -24,9 +24,16 @@ async def keyboard_from_queryset(
 
     pagination_buttons = []
     if previous_button_data:
-        pagination_buttons.append(InlineKeyboardButton(text='<<', callback_data=previous_button_data))
+        pagination_buttons.append(
+            InlineKeyboardButton(
+                text='<<',
+                callback_data=previous_button_data,
+            ),
+        )
     if next_button_data:
-        pagination_buttons.append(InlineKeyboardButton(text='>>', callback_data=next_button_data))
+        pagination_buttons.append(
+            InlineKeyboardButton(text='>>', callback_data=next_button_data),
+        )
 
     kb.adjust(1)
     kb.row(*pagination_buttons)
@@ -34,14 +41,14 @@ async def keyboard_from_queryset(
 
 
 async def get_paginated_keyboard(
-        model: type[Model],
-        *,
-        filters: dict = None,
-        page: int = 1,
-        prefix: str = '',
-        back_button_data: str = None,
-        previous_button_data: str = 'catalog_previous',
-        next_button_data: str = 'catalog_next',
+    model: type[Model],
+    *,
+    filters: dict = None,
+    page: int = 1,
+    prefix: str = '',
+    back_button_data: str = None,
+    previous_button_data: str = 'catalog_previous',
+    next_button_data: str = 'catalog_next',
 ) -> InlineKeyboardMarkup:
     if not filters:
         filters = {}
@@ -61,7 +68,11 @@ async def get_paginated_keyboard(
 
 
 def get_back_button_data(category: Category) -> str:
-    return f'category_{category.parent_category.pk}' if category.parent_category else 'categories_root'
+    return (
+        f'category_{category.parent_category.pk}'
+        if category.parent_category
+        else 'categories_root'
+    )
 
 
 async def get_categories_root_keyboard(page: int = 1) -> InlineKeyboardMarkup:
@@ -73,21 +84,27 @@ async def get_categories_root_keyboard(page: int = 1) -> InlineKeyboardMarkup:
     )
 
 
-async def get_categories_keyboard(parent_category: Category, page: int = 1) -> InlineKeyboardMarkup:
+async def get_categories_keyboard(
+    parent_category: Category,
+    page: int = 1,
+) -> InlineKeyboardMarkup:
     return await get_paginated_keyboard(
         Category,
         filters={'parent_category': parent_category},
         page=page,
         prefix='category',
-        back_button_data=get_back_button_data(parent_category)
+        back_button_data=get_back_button_data(parent_category),
     )
 
 
-async def get_products_keyboard(category: Category, page: int = 1) -> InlineKeyboardMarkup:
+async def get_products_keyboard(
+    category: Category,
+    page: int = 1,
+) -> InlineKeyboardMarkup:
     return await get_paginated_keyboard(
         Product,
         filters={'category': category},
         page=page,
         prefix='product',
-        back_button_data=get_back_button_data(category)
+        back_button_data=get_back_button_data(category),
     )

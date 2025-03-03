@@ -1,5 +1,3 @@
-import asyncio
-from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 

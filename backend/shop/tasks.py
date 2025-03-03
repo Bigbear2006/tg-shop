@@ -1,7 +1,7 @@
 import asyncio
 from string import Template
 
-from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from celery import shared_task
 from celery.utils.log import get_task_logger
 
@@ -17,23 +17,28 @@ async def send_message(client: Client, text):
     try:
         await bot.send_message(client.pk, text)
     except TelegramRetryAfter as e:
-        task_logger.info(f'Cannot send a message to user (id={client.pk}) because of rate limit')
+        task_logger.info(
+            f'Cannot send a message to user (id={client.pk}) '
+            f'because of rate limit',
+        )
         await asyncio.sleep(e.retry_after)
         await send_message(client, text)
     except TelegramBadRequest as e:
         task_logger.info(
             f'Cannot send a message to user (id={client.pk}) '
-            f'because of an {e.__class__.__name__} error: {str(e)}'
+            f'because of an {e.__class__.__name__} error: {str(e)}',
         )
 
 
 @shared_task
 def send_dispatch(text: str):
     async def main():
-        await asyncio.wait([
-            asyncio.create_task(send_message(client, text))
-            async for client in Client.objects.all()
-        ])
+        await asyncio.wait(
+            [
+                asyncio.create_task(send_message(client, text))
+                async for client in Client.objects.all()
+            ],
+        )
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())

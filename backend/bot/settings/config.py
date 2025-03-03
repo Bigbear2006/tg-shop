@@ -11,7 +11,9 @@ class Settings:
     BOT_TOKEN: str = field(default_factory=lambda: env('BOT_TOKEN'))
     PROVIDER_TOKEN: str = field(default_factory=lambda: env('PROVIDER_TOKEN'))
     REDIS_URL: str = field(default_factory=lambda: env('REDIS_URL'))
-    SUBSCRIBE_CHATS: list = field(default_factory=lambda: env.list('SUBSCRIBE_CHATS'))
+    SUBSCRIBE_CHATS: list = field(
+        default_factory=lambda: env.list('SUBSCRIBE_CHATS'),
+    )
 
     PAGE_SIZE: int = field(default=3)
     CURRENCY: str = field(default='RUB')

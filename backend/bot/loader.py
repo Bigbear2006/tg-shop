@@ -1,6 +1,6 @@
 import logging
 
-from aiogram import Dispatcher, Bot
+from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
 from bot.settings import settings

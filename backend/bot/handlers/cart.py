@@ -1,12 +1,20 @@
 from datetime import datetime
 
 import openpyxl
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery, FSInputFile, InlineKeyboardMarkup, InlineKeyboardButton, \
-    InputMediaPhoto, LabeledPrice, PreCheckoutQuery
+from aiogram.types import (
+    CallbackQuery,
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaPhoto,
+    LabeledPrice,
+    Message,
+    PreCheckoutQuery,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.filters import IsChatMember
@@ -40,7 +48,9 @@ async def display_cart(msg: Message, state: FSMContext):
     cart = await state.get_value('cart', {})
 
     if not cart:
-        return await msg.answer('Ваша корзина пуста.\nПерейти в каталог - /catalog')
+        return await msg.answer(
+            'Ваша корзина пуста.\nПерейти в каталог - /catalog',
+        )
 
     # kb = InlineKeyboardBuilder()
     # products = Product.objects.filter(pk__in=cart.keys())
@@ -67,17 +77,34 @@ async def display_cart_product(query: CallbackQuery, state: FSMContext):
     except Exception as e:
         return logger.exception(
             f'An exception occurred '
-            f'during the extracting product_id from {query.data}: {e}'
+            f'during the extracting product_id from {query.data}: {e}',
         )
 
     product = await Product.objects.aget(pk=product_id)
     media = product.image_tg_id or FSInputFile(product.image.url.lstrip('/'))
     caption = f'{product.title}\n\n{product.description}'
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Купить', callback_data=f'buy_{product_id}')],
-        [InlineKeyboardButton(text='Сменить количество', callback_data=f'change_count_{product_id}')],
-        [InlineKeyboardButton(text='Удалить из корзины', callback_data=f'delete_from_cart_{product_id}')],
-    ])
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text='Купить',
+                    callback_data=f'buy_{product_id}',
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text='Сменить количество',
+                    callback_data=f'change_count_{product_id}',
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text='Удалить из корзины',
+                    callback_data=f'delete_from_cart_{product_id}',
+                ),
+            ],
+        ],
+    )
 
     product_message_id: int = await state.get_value('product_message_id')
     if product_message_id:
@@ -87,7 +114,7 @@ async def display_cart_product(query: CallbackQuery, state: FSMContext):
                 business_connection_id=query.message.business_connection_id,
                 chat_id=query.message.chat.id,
                 message_id=product_message_id,
-                reply_markup=kb
+                reply_markup=kb,
             )
         except TelegramBadRequest as e:
             return logger.exception(e)
@@ -98,7 +125,7 @@ async def display_cart_product(query: CallbackQuery, state: FSMContext):
             business_connection_id=query.message.business_connection_id,
             caption=caption,
             reply_markup=kb,
-            reply_to_message_id=query.message.message_id
+            reply_to_message_id=query.message.message_id,
         )
     await state.update_data({'product_message_id': product_message.message_id})
 
@@ -115,7 +142,7 @@ async def buy(query: CallbackQuery, state: FSMContext):
         except Exception as e:
             return logger.exception(
                 f'An exception occurred '
-                f'during the extracting product_id from {query.data}: {e}'
+                f'during the extracting product_id from {query.data}: {e}',
             )
         await state.update_data(product_id=product_id)
     else:
@@ -131,19 +158,24 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     data = await state.get_data()
     cart = data.get('cart')
     buy_whole_cart = data.get('buy_whole_cart')
-    test_card_info = 'Для оплаты используйте данные тестовой карты: 1111 1111 1111 1026, 12/22, 000'
+    test_card_info = (
+        'Для оплаты используйте данные тестовой карты: '
+        '1111 1111 1111 1026, 12/22, 000'
+    )
 
     if buy_whole_cart:
-        amount = sum([
-            int(product.price * 100) * cart.get(str(product.pk))
-            async for product in Product.objects.filter(pk__in=cart.keys())
-        ])
+        amount = sum(
+            [
+                int(product.price * 100) * cart.get(str(product.pk))
+                async for product in Product.objects.filter(pk__in=cart.keys())
+            ],
+        )
         await state.set_state(None)
         return await msg.bot.send_invoice(
             msg.chat.id,
             'Покупка',
             f'Покупка всей корзины.\n{test_card_info}',
-            f'whole_cart',
+            'whole_cart',
             settings.CURRENCY,
             [LabeledPrice(label=settings.CURRENCY, amount=amount)],
             provider_token=settings.PROVIDER_TOKEN,
@@ -186,7 +218,33 @@ async def on_successful_payment(msg: Message, state: FSMContext):
     if msg.successful_payment.invoice_payload == 'whole_cart':
         async for product in Product.objects.filter(pk__in=cart.keys()):
             product_count = cart.get(str(product.pk))
-            sheet.append([
+            sheet.append(
+                [
+                    msg.successful_payment.provider_payment_charge_id,
+                    msg.from_user.id,
+                    product.pk,
+                    f'@{msg.from_user.username}',
+                    delivery_location,
+                    product.title,
+                    product_count,
+                    f'{(product.price * product_count):.2f}',
+                    order_date,
+                ],
+            )
+        wb.save(settings.ORDERS_FILE)
+
+        await state.update_data(buy_whole_cart=None)
+        await msg.answer(
+            f'Поздравляем c покупкой '
+            f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!',
+        )
+    else:
+        product = await Product.objects.aget(
+            pk=int(msg.successful_payment.invoice_payload.split('_')[-1]),
+        )
+        product_count = cart.get(str(product.pk))
+        sheet.append(
+            [
                 msg.successful_payment.provider_payment_charge_id,
                 msg.from_user.id,
                 product.pk,
@@ -194,36 +252,14 @@ async def on_successful_payment(msg: Message, state: FSMContext):
                 delivery_location,
                 product.title,
                 product_count,
-                f'{(product.price * product_count):.2f}',
+                f'{msg.successful_payment.total_amount / 100:.2f}',
                 order_date,
-            ])
-        wb.save(settings.ORDERS_FILE)
-
-        await state.update_data(buy_whole_cart=None)
-        await msg.answer(
-            f'Поздравляем c покупкой '
-            f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!'
+            ],
         )
-    else:
-        product = await Product.objects.aget(
-            pk=int(msg.successful_payment.invoice_payload.split('_')[-1]),
-        )
-        product_count = cart.get(str(product.pk))
-        sheet.append([
-            msg.successful_payment.provider_payment_charge_id,
-            msg.from_user.id,
-            product.pk,
-            f'@{msg.from_user.username}',
-            delivery_location,
-            product.title,
-            product_count,
-            f'{msg.successful_payment.total_amount / 100:.2f}',
-            order_date,
-        ])
         wb.save(settings.ORDERS_FILE)
         await msg.answer(
             f'Поздравляем c покупкой {product.title} ({product_count} шт.) '
-            f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!'
+            f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!',
         )
 
 
@@ -234,7 +270,7 @@ async def change_product_count(query: CallbackQuery, state: FSMContext):
     except Exception as e:
         return logger.exception(
             f'An exception occurred '
-            f'during the extracting product_id from {query.data}: {e}'
+            f'during the extracting product_id from {query.data}: {e}',
         )
 
     await state.update_data({'product_id': product_id})
@@ -249,7 +285,7 @@ async def delete_product_from_cart(query: CallbackQuery, state: FSMContext):
     except Exception as e:
         return logger.exception(
             f'An exception occurred '
-            f'during the extracting product_id from {query.data}: {e}'
+            f'during the extracting product_id from {query.data}: {e}',
         )
 
     data = await state.get_data()
