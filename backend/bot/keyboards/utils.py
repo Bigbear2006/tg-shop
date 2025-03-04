@@ -108,3 +108,55 @@ async def get_products_keyboard(
         prefix='product',
         back_button_data=get_back_button_data(category),
     )
+
+
+async def get_product_keyboard(product_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text='Добавить в корзину',
+                    callback_data=f'add_to_cart_{product_id}',
+                ),
+            ],
+        ],
+    )
+
+
+async def get_product_detail_keyboard(product_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text='Купить',
+                    callback_data=f'buy_{product_id}',
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text='Сменить количество',
+                    callback_data=f'change_count_{product_id}',
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text='Удалить из корзины',
+                    callback_data=f'delete_from_cart_{product_id}',
+                ),
+            ],
+        ],
+    )
+
+
+async def get_cart_keyboard(cart: dict[str, int]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    products = Product.objects.filter(pk__in=cart.keys())
+
+    kb.button(text='Оплатить всю корзину', callback_data='buy_whole_cart')
+    async for product in products:
+        kb.button(
+            text=f'{product.title} ({cart.get(str(product.pk), 0)} шт.)',
+            callback_data=f'cart_product_{product.pk}',
+        )
+    kb.adjust(1)
+    return kb.as_markup()

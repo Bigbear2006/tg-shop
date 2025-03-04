@@ -1,3 +1,4 @@
+from aiogram import types
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -6,6 +7,37 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+
+
+class ClientManager(models.Manager):
+    async def from_tg_user(self, user: types.User) -> 'Client':
+        return await self.acreate(
+            id=user.id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+            is_premium=user.is_premium or False,
+        )
+
+    async def update_from_tg_user(self, user: types.User) -> None:
+        await self.filter(pk=user.id).aupdate(
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+            is_premium=user.is_premium or False,
+        )
+
+    async def create_or_update_from_tg_user(
+            self,
+            user: types.User,
+    ) -> tuple['Client', bool]:
+        try:
+            client = await self.aget(id=user.id)
+            await self.update_from_tg_user(user)
+            await client.arefresh_from_db()
+            return client, False
+        except self.DoesNotExist:
+            return await self.from_tg_user(user), True
 
 
 class Client(models.Model):
@@ -26,7 +58,7 @@ class Client(models.Model):
         default=False,
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    objects: models.Manager
+    objects = ClientManager()
 
     class Meta:
         verbose_name = 'Клиент'

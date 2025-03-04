@@ -1,11 +1,14 @@
 venv
 .idea
 __pycache__
-media
+
 data
 letsencrypt
 webroot
+media
 static
+
 db.sqlite3
 .env
 orders.xlsx
+data.json

@@ -1,25 +1,21 @@
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     CallbackQuery,
-    FSInputFile,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputMediaPhoto,
     Message,
 )
 from django.db.models import Count
 
 from bot.filters import IsChatMember
+from bot.handlers.utils import send_or_update_product_message
 from bot.keyboards.inline import yes_no_kb
 from bot.keyboards.utils import (
     get_categories_keyboard,
     get_categories_root_keyboard,
+    get_product_keyboard,
     get_products_keyboard,
 )
-from bot.loader import logger
 from bot.states import CatalogState
 from shop.models import Category, Product
 
@@ -50,10 +46,11 @@ async def change_page(query: CallbackQuery, state: FSMContext):
     await state.update_data(page=page)
 
     if not category_id:
-        return await query.message.edit_text(
+        await query.message.edit_text(
             'Все категории',
             reply_markup=await get_categories_root_keyboard(page),
         )
+        return
 
     category = (
         await Category.objects.annotate(
@@ -64,10 +61,11 @@ async def change_page(query: CallbackQuery, state: FSMContext):
     )
 
     if category.subcategories_count == 0:
-        return await query.message.edit_text(
+        await query.message.edit_text(
             f'Товары категории {category}',
             reply_markup=await get_products_keyboard(category, page),
         )
+        return
 
     await query.message.edit_text(
         f'Категория {category}',
@@ -77,14 +75,7 @@ async def change_page(query: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith('category'))
 async def expand_category(query: CallbackQuery, state: FSMContext):
-    try:
-        category_id = int(query.data.split('_')[-1])
-    except Exception as e:
-        return logger.exception(
-            f'An exception occurred '
-            f'during the extracting category_id from {query.data}: {e}',
-        )
-
+    category_id = int(query.data.split('_')[-1])
     await state.update_data(category_id=category_id)
     await state.update_data(page=1)
 
@@ -97,10 +88,11 @@ async def expand_category(query: CallbackQuery, state: FSMContext):
     )
 
     if category.subcategories_count == 0:
-        return await query.message.edit_text(
+        await query.message.edit_text(
             f'Товары категории {category}',
             reply_markup=await get_products_keyboard(category),
         )
+        return
 
     await query.message.edit_text(
         f'Категория {category}',
@@ -119,68 +111,20 @@ async def display_categories_root(query: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith('product'))
 async def display_product(query: CallbackQuery, state: FSMContext):
-    try:
-        product_id = int(query.data.split('_')[-1])
-    except Exception as e:
-        return logger.exception(
-            f'An exception occurred '
-            f'during the extracting product_id from {query.data}: {e}',
-        )
-
-    product = await Product.objects.aget(pk=product_id)
-    media = product.image_tg_id or FSInputFile(product.image.url.lstrip('/'))
-    caption = f'{product.title}\n\n{product.description}'
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text='Добавить в корзину',
-                    callback_data=f'add_to_cart_{product_id}',
-                ),
-            ],
-        ],
+    await send_or_update_product_message(
+        query,
+        state,
+        reply_markup=await get_product_keyboard(
+            int(query.data.split('_')[-1]),
+        ),
     )
-
-    product_message_id: int = await state.get_value('product_message_id')
-    if product_message_id:
-        try:
-            product_message = await query.bot.edit_message_media(
-                media=InputMediaPhoto(media=media, caption=caption),
-                business_connection_id=query.message.business_connection_id,
-                chat_id=query.message.chat.id,
-                message_id=product_message_id,
-                reply_markup=kb,
-            )
-        except TelegramBadRequest:
-            return
-    else:
-        product_message = await query.bot.send_photo(
-            chat_id=query.message.chat.id,
-            photo=media,
-            business_connection_id=query.message.business_connection_id,
-            caption=caption,
-            reply_markup=kb,
-            reply_to_message_id=query.message.message_id,
-        )
-    await state.update_data({'product_message_id': product_message.message_id})
-
-    if not product.image_tg_id:
-        product.image_tg_id = product_message.photo[0].file_id
-        await product.asave()
 
 
 @router.callback_query(F.data.startswith('add_to_cart'))
 async def add_to_cart(query: CallbackQuery, state: FSMContext):
-    try:
-        product_id = int(query.data.split('_')[-1])
-    except Exception as e:
-        return logger.exception(
-            f'An exception occurred '
-            f'during the extracting product_id from {query.data}: {e}',
-        )
+    product = await Product.objects.aget(pk=int(query.data.split('_')[-1]))
 
-    product = await Product.objects.aget(pk=product_id)
-    await state.update_data({'product_id': product_id})
+    await state.update_data(product_id=product.pk)
     await state.set_state(CatalogState.count)
     await query.message.answer(
         f'Сколько штук {product.title} вы хотите добавить в корзину?',
@@ -191,15 +135,17 @@ async def add_to_cart(query: CallbackQuery, state: FSMContext):
 async def set_product_count(msg: Message, state: FSMContext):
     try:
         count = int(msg.text)
-    except Exception:
-        return await msg.answer(
+    except ValueError:
+        await msg.answer(
             'Пожалуйста, введите целое положительное число.',
         )
+        return
 
     if count <= 0:
-        return await msg.answer(
+        await msg.answer(
             'Пожалуйста, введите целое положительное число.',
         )
+        return
 
     product = await Product.objects.aget(
         pk=await state.get_value('product_id'),
@@ -221,7 +167,7 @@ async def confirm_product_addition(query: CallbackQuery, state: FSMContext):
     cart = data.get('cart', {})
 
     cart.update({product_id: count})
-    await state.update_data({'cart': cart})
+    await state.update_data(cart=cart)
 
     product = await Product.objects.aget(pk=product_id)
     await state.set_state(None)
@@ -243,8 +189,3 @@ async def cancel_product_addition(query: CallbackQuery, state: FSMContext):
         f'Добавление в корзину товара {product.title} ({count} шт.) отменено\n'
         f'Перейти в корзину - /cart',
     )
-
-
-# @router.callback_query()
-# async def default(query: CallbackQuery):
-#     print(query.data)

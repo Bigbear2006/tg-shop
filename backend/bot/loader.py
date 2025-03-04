@@ -6,12 +6,12 @@ from aiogram.fsm.storage.redis import RedisStorage
 from bot.settings import settings
 
 logging.basicConfig(
-    level=logging.INFO,
     format='[{asctime}] {levelname} {name}: {message}',
     datefmt='%Y-%m-%d %H:%M:%S',
     style='{',
 )
 logger = logging.getLogger('bot')
+logger.setLevel(logging.INFO)
 
 bot = Bot(settings.BOT_TOKEN)
 storage = RedisStorage.from_url(settings.REDIS_URL)
