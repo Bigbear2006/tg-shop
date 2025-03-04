@@ -137,3 +137,33 @@ AUTH_USER_MODEL = 'shop.User'
 CELERY_BROKER_URL = env('CELERY_BROKER_URL')
 
 CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'default',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'formatter': 'default',
+            'filename': 'logs/django.log',
+        },
+    },
+    'loggers': {
+        'shop.signals': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

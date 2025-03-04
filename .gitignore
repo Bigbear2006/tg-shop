@@ -1,6 +1,7 @@
 venv
 .idea
 __pycache__
+logs
 
 data
 letsencrypt

@@ -34,7 +34,7 @@ async def display_catalog(msg: Message, state: FSMContext):
 
 
 @router.callback_query(F.data.in_(('catalog_previous', 'catalog_next')))
-async def change_page(query: CallbackQuery, state: FSMContext):
+async def change_catalog_page(query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     page = data.get('page', 1)
     category_id = data.get('category_id')
@@ -135,7 +135,7 @@ async def add_to_cart(query: CallbackQuery, state: FSMContext):
 async def set_product_count(msg: Message, state: FSMContext):
     try:
         count = int(msg.text)
-    except ValueError:
+    except (ValueError, TypeError):
         await msg.answer(
             'Пожалуйста, введите целое положительное число.',
         )

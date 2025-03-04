@@ -1,9 +1,12 @@
+import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from bot.loader import logger
 from shop.models import Dispatch
 from shop.tasks import send_dispatch
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=Dispatch)

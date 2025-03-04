@@ -1,5 +1,6 @@
 from typing import Any
 
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
@@ -19,8 +20,9 @@ class IsChatMember(BaseFilter):
                 await msg.answer(
                     f'Привет, {msg.from_user.full_name}!\n'
                     f'Чтобы использовать бота '
-                    f'надо подписаться на наш канал и чат',
+                    f'надо подписаться на наш канал и чат.\n'
+                    f'Подпишись и введите команду снова.',
                     reply_markup=subscribe_chats_kb,
                 )
-                return False
+                raise SkipHandler
         return True

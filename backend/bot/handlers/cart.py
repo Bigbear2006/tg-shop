@@ -27,7 +27,7 @@ router.message.filter(IsChatMember())
 @router.message(Command('cart'))
 @router.message(F.text == 'Корзина')
 async def display_cart(msg: Message, state: FSMContext):
-    await state.update_data(product_message_id=None)
+    await state.update_data(product_message_id=None, page=1)
     cart = await state.get_value('cart', {})
 
     if not cart:
@@ -42,6 +42,23 @@ async def display_cart(msg: Message, state: FSMContext):
         reply_markup=await get_cart_keyboard(cart),
     )
     await state.update_data(cart_message_id=message.message_id)
+
+
+@router.callback_query(F.data.in_(('cart_previous', 'cart_next')))
+async def change_cart_page(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    cart = data.get('cart', {})
+    page = data.get('page', 1)
+
+    if query.data == 'cart_previous':
+        page -= 1
+    else:
+        page += 1
+    await state.update_data(page=page)
+
+    await query.message.edit_reply_markup(
+        reply_markup=await get_cart_keyboard(cart, page)
+    )
 
 
 @router.callback_query(F.data.startswith('cart_product'))
@@ -85,6 +102,14 @@ async def set_delivery_location(msg: Message, state: FSMContext):
                 async for product in Product.objects.filter(pk__in=cart.keys())
             ],
         )
+
+        if amount > settings.MAX_AMOUNT:
+            await msg.answer(
+                'Сумма покупки превышает 250 000 ₽.\n.'
+                'Попробуйте оплатить товары отдельно.'
+            )
+            return
+
         await state.set_state(None)
         await msg.bot.send_invoice(
             msg.chat.id,
@@ -101,6 +126,13 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     product = await Product.objects.aget(pk=product_id)
     product_count = cart.get(str(product_id))
     amount = int(product.price * 100) * product_count
+
+    if amount > settings.MAX_AMOUNT:
+        await msg.answer(
+            'Сумма покупки превышает 250 000 ₽.\n'
+            'Попробуйте уменьшить количество товара'
+        )
+        return
 
     await state.set_state(None)
     await msg.bot.send_invoice(
@@ -189,7 +221,6 @@ async def delete_product_from_cart(query: CallbackQuery, state: FSMContext):
 
     product_id = query.data.split('_')[-1]
     cart.pop(product_id, None)
-    await state.update_data(cart=cart)
 
     if len(cart) == 0:
         await query.bot.edit_message_text(
@@ -206,5 +237,5 @@ async def delete_product_from_cart(query: CallbackQuery, state: FSMContext):
             reply_markup=await get_cart_keyboard(cart),
         )
 
-    await state.update_data(product_message_id=None)
+    await state.update_data(cart=cart, product_message_id=None, page=1)
     await query.message.delete()

@@ -40,13 +40,14 @@ async def main():
 
     init_excel()
 
-    from bot.handlers import cart, catalog, commands, inline
+    from bot.handlers import cart, catalog, commands, inline, errors
 
     dp.include_routers(
         commands.router,
         catalog.router,
         cart.router,
         inline.router,
+        errors.router,
     )
     dp.message.filter(F.chat.type == 'private')
 

@@ -20,7 +20,7 @@ async def send_or_update_product_message(
 ) -> None:
     product = await Product.objects.aget(pk=int(query.data.split('_')[-1]))
     media = product.image_tg_id or FSInputFile(product.image.url.lstrip('/'))
-    caption = f'{product.title}\n\n{product.description}'
+    caption = f'{product}\n\n{product.description}'
 
     product_message_id: int = await state.get_value('product_message_id')
     if product_message_id:

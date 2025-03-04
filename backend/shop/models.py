@@ -1,5 +1,6 @@
 from aiogram import types
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 
 
@@ -36,7 +37,7 @@ class ClientManager(models.Manager):
             await self.update_from_tg_user(user)
             await client.arefresh_from_db()
             return client, False
-        except self.DoesNotExist:
+        except ObjectDoesNotExist:
             return await self.from_tg_user(user), True
 
 
@@ -127,7 +128,7 @@ class Product(models.Model):
         ordering = ['title']
 
     def __str__(self):
-        return self.title
+        return f'{self.title} ({int(self.price):,} ₽)'
 
 
 class Dispatch(models.Model):

@@ -6,6 +6,28 @@ from bot.settings import settings
 from shop.models import Category, Product
 
 
+async def get_pagination_buttons(
+    previous_button_data: str = None,
+    next_button_data: str = None
+) -> list[InlineKeyboardButton]:
+    pagination_buttons = []
+
+    if previous_button_data:
+        pagination_buttons.append(
+            InlineKeyboardButton(
+                text='<<',
+                callback_data=previous_button_data,
+            ),
+        )
+
+    if next_button_data:
+        pagination_buttons.append(
+            InlineKeyboardButton(text='>>', callback_data=next_button_data),
+        )
+
+    return pagination_buttons
+
+
 async def keyboard_from_queryset(
     queryset: QuerySet,
     *,
@@ -22,21 +44,11 @@ async def keyboard_from_queryset(
     async for obj in queryset:
         kb.button(text=str(obj), callback_data=f'{prefix}_{obj.pk}')
 
-    pagination_buttons = []
-    if previous_button_data:
-        pagination_buttons.append(
-            InlineKeyboardButton(
-                text='<<',
-                callback_data=previous_button_data,
-            ),
-        )
-    if next_button_data:
-        pagination_buttons.append(
-            InlineKeyboardButton(text='>>', callback_data=next_button_data),
-        )
-
     kb.adjust(1)
-    kb.row(*pagination_buttons)
+    kb.row(*await get_pagination_buttons(
+        previous_button_data,
+        next_button_data,
+    ))
     return kb.as_markup()
 
 
@@ -148,9 +160,13 @@ async def get_product_detail_keyboard(product_id: int) -> InlineKeyboardMarkup:
     )
 
 
-async def get_cart_keyboard(cart: dict[str, int]) -> InlineKeyboardMarkup:
+async def get_cart_keyboard(cart: dict[str, int], page: int = 1) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    products = Product.objects.filter(pk__in=cart.keys())
+
+    total_count = len(cart)
+    total_pages = (total_count + settings.PAGE_SIZE - 1) // settings.PAGE_SIZE
+    start, end = (page - 1) * settings.PAGE_SIZE, page * settings.PAGE_SIZE
+    products = Product.objects.filter(pk__in=cart.keys())[start:end]
 
     kb.button(text='Оплатить всю корзину', callback_data='buy_whole_cart')
     async for product in products:
@@ -158,5 +174,10 @@ async def get_cart_keyboard(cart: dict[str, int]) -> InlineKeyboardMarkup:
             text=f'{product.title} ({cart.get(str(product.pk), 0)} шт.)',
             callback_data=f'cart_product_{product.pk}',
         )
+
     kb.adjust(1)
+    kb.row(*await get_pagination_buttons(
+        'cart_previous' if page > 1 else None,
+        'cart_next' if page < total_pages else None,
+    ))
     return kb.as_markup()

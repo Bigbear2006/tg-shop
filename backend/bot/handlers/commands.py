@@ -13,7 +13,7 @@ router = Router()
 
 @router.message(Command('start'), IsChatMember())
 async def start(msg: Message, state: FSMContext):
-    client, created = Client.objects.create_or_update_from_tg_user(
+    client, created = await Client.objects.create_or_update_from_tg_user(
         msg.from_user,
     )
     if created:
@@ -23,6 +23,9 @@ async def start(msg: Message, state: FSMContext):
 
     await state.set_state(None)
     return await msg.answer(
-        f'Привет, {msg.from_user.full_name}!',
+        f'Привет, {msg.from_user.full_name}!\n'
+        f'Перейти в каталог - /catalog\n'
+        f'Если у тебя есть вопрос, то ты можешь задать его, например:\n'
+        f'@learnpoemsbot как оформить заказ?',
         reply_markup=menu_kb,
     )
