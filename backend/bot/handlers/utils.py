@@ -4,7 +4,8 @@ from aiogram.types import (
     CallbackQuery,
     FSInputFile,
     InlineKeyboardMarkup,
-    InputMediaPhoto, Message,
+    InputMediaPhoto,
+    Message,
 )
 from openpyxl.worksheet.worksheet import Worksheet
 

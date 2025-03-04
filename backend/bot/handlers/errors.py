@@ -10,5 +10,5 @@ router = Router()
 async def error_handler(event: ErrorEvent):
     logger.exception(
         f'{event.exception.__class__.__name__}: '
-        f'{str(event.exception)}'
+        f'{str(event.exception)}',
     )

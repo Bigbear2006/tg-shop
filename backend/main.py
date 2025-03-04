@@ -40,7 +40,7 @@ async def main():
 
     init_excel()
 
-    from bot.handlers import cart, catalog, commands, inline, errors
+    from bot.handlers import cart, catalog, commands, errors, inline
 
     dp.include_routers(
         commands.router,

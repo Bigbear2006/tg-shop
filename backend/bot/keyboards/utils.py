@@ -8,7 +8,7 @@ from shop.models import Category, Product
 
 async def get_pagination_buttons(
     previous_button_data: str = None,
-    next_button_data: str = None
+    next_button_data: str = None,
 ) -> list[InlineKeyboardButton]:
     pagination_buttons = []
 
@@ -160,7 +160,10 @@ async def get_product_detail_keyboard(product_id: int) -> InlineKeyboardMarkup:
     )
 
 
-async def get_cart_keyboard(cart: dict[str, int], page: int = 1) -> InlineKeyboardMarkup:
+async def get_cart_keyboard(
+        cart: dict[str, int],
+        page: int = 1,
+) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
 
     total_count = len(cart)

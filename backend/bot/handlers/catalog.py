@@ -16,6 +16,7 @@ from bot.keyboards.utils import (
     get_product_keyboard,
     get_products_keyboard,
 )
+from bot.settings import settings
 from bot.states import CatalogState
 from shop.models import Category, Product
 
@@ -151,10 +152,19 @@ async def set_product_count(msg: Message, state: FSMContext):
         pk=await state.get_value('product_id'),
     )
 
+    amount = int(product.price * 100) * count
+    if amount > settings.MAX_AMOUNT:
+        await msg.answer(
+            f'Сумма покупки ({amount / 100:,.2f} ₽) превышает 250 000 ₽.\n'
+            'Укажите меньшее количество',
+        )
+        return
+
     await state.update_data(count=count)
     await state.set_state(CatalogState.confirmation)
     await msg.answer(
-        f'Вы точно хотите добавить в корзину {product.title} ({count} шт.)?',
+        f'Вы точно хотите добавить в корзину {product.title} ({count} шт.)?\n'
+        f'Это будет стоить {amount / 100:,} ₽',
         reply_markup=yes_no_kb,
     )
 

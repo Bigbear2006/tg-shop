@@ -73,7 +73,7 @@ class Client(models.Model):
         return {
             'id': self.id,
             'first_name': self.first_name,
-            'last_name': self.last_name,
+            'last_name': self.last_name or '',
             'username': self.username,
             'is_premium': self.is_premium,
         }
@@ -132,7 +132,11 @@ class Product(models.Model):
 
 
 class Dispatch(models.Model):
-    text = models.TextField(verbose_name='Текст')
+    text = models.TextField(
+        verbose_name='Текст',
+        help_text='Вы можете использовать переменные: '
+                  '${id}, ${username}, ${first_name}, ${last_name}',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     objects: models.Manager
 

@@ -9,7 +9,7 @@ logging.basicConfig(
     filename='logs/bot.log',
     format='[{asctime}] {levelname} {name}: {message}',
     datefmt='%Y-%m-%d %H:%M:%S',
-    style='{'
+    style='{',
 )
 logger = logging.getLogger('bot')
 logger.setLevel(logging.INFO)

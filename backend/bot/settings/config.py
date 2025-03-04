@@ -15,7 +15,7 @@ class Settings:
         default_factory=lambda: env.list('SUBSCRIBE_CHATS'),
     )
 
-    PAGE_SIZE: int = field(default=1)
+    PAGE_SIZE: int = field(default=3)
     CURRENCY: str = field(default='RUB')
     MAX_AMOUNT: str = field(default=25_000_000)  # 250 000.00 ₽
     ORDERS_FILE: str = field(default='orders.xlsx')

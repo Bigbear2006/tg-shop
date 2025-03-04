@@ -3,6 +3,7 @@ from datetime import datetime
 
 import openpyxl
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
@@ -13,7 +14,7 @@ from aiogram.types import (
 )
 
 from bot.filters import IsChatMember
-from bot.handlers.utils import send_or_update_product_message, add_order
+from bot.handlers.utils import add_order, send_or_update_product_message
 from bot.keyboards.utils import get_cart_keyboard, get_product_detail_keyboard
 from bot.loader import logger
 from bot.settings import settings
@@ -57,7 +58,7 @@ async def change_cart_page(query: CallbackQuery, state: FSMContext):
     await state.update_data(page=page)
 
     await query.message.edit_reply_markup(
-        reply_markup=await get_cart_keyboard(cart, page)
+        reply_markup=await get_cart_keyboard(cart, page),
     )
 
 
@@ -104,9 +105,10 @@ async def set_delivery_location(msg: Message, state: FSMContext):
         )
 
         if amount > settings.MAX_AMOUNT:
+            await state.set_state(None)
             await msg.answer(
                 'Сумма покупки превышает 250 000 ₽.\n.'
-                'Попробуйте оплатить товары отдельно.'
+                'Попробуйте оплатить товары отдельно.',
             )
             return
 
@@ -114,7 +116,7 @@ async def set_delivery_location(msg: Message, state: FSMContext):
         await msg.bot.send_invoice(
             msg.chat.id,
             'Покупка',
-            f'Покупка всей корзины.\n{test_card_info}',
+            f'Вы оплачиваете всю корзину.\n{test_card_info}',
             'whole_cart',
             settings.CURRENCY,
             [LabeledPrice(label=settings.CURRENCY, amount=amount)],
@@ -128,9 +130,10 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     amount = int(product.price * 100) * product_count
 
     if amount > settings.MAX_AMOUNT:
+        await state.set_state(None)
         await msg.answer(
             'Сумма покупки превышает 250 000 ₽.\n'
-            'Попробуйте уменьшить количество товара'
+            'Попробуйте уменьшить количество товара',
         )
         return
 
@@ -138,7 +141,8 @@ async def set_delivery_location(msg: Message, state: FSMContext):
     await msg.bot.send_invoice(
         msg.chat.id,
         'Покупка',
-        f'Покупка {product.title} ({product_count} шт.).\n{test_card_info}',
+        f'Вы оплачиваете {product.title} ({product_count} шт.).'
+        f'\n{test_card_info}',
         f'product_{product_id}',
         settings.CURRENCY,
         [LabeledPrice(label=settings.CURRENCY, amount=amount)],
@@ -173,7 +177,7 @@ async def on_successful_payment(msg: Message, state: FSMContext):
                     msg,
                     product=product,
                     product_count=product_count,
-                    amount=f'{(product.price * product_count):.2f}',
+                    amount=f'{(product.price * product_count):,.2f}',
                     delivery_location=delivery_location,
                     order_date=order_date,
                 )
@@ -182,7 +186,8 @@ async def on_successful_payment(msg: Message, state: FSMContext):
             await state.update_data(buy_whole_cart=None)
             await msg.answer(
                 f'Поздравляем c покупкой '
-                f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!',
+                f'на сумму {msg.successful_payment.total_amount / 100:,.2f} '
+                f'₽!',
             )
         else:
             product = await Product.objects.aget(
@@ -194,15 +199,17 @@ async def on_successful_payment(msg: Message, state: FSMContext):
                 msg,
                 product=product,
                 product_count=product_count,
-                amount=f'{msg.successful_payment.total_amount / 100:.2f}',
+                amount=f'{msg.successful_payment.total_amount / 100:,.2f}',
                 delivery_location=delivery_location,
                 order_date=order_date,
             )
             wb.save(settings.ORDERS_FILE)
 
             await msg.answer(
-                f'Поздравляем c покупкой {product.title} ({product_count} шт.) '
-                f'на сумму {msg.successful_payment.total_amount / 100:.2f} ₽!',
+                f'Поздравляем c покупкой {product.title} '
+                f'({product_count} шт.) '
+                f'на сумму {msg.successful_payment.total_amount / 100:,.2f} '
+                f'₽!',
             )
 
 
@@ -223,12 +230,15 @@ async def delete_product_from_cart(query: CallbackQuery, state: FSMContext):
     cart.pop(product_id, None)
 
     if len(cart) == 0:
-        await query.bot.edit_message_text(
-            'Ваша корзина пуста.\nПерейти в каталог - /catalog',
-            business_connection_id=query.message.business_connection_id,
-            chat_id=query.message.chat.id,
-            message_id=cart_message_id,
-        )
+        try:
+            await query.bot.edit_message_text(
+                'Ваша корзина пуста.\nПерейти в каталог - /catalog',
+                business_connection_id=query.message.business_connection_id,
+                chat_id=query.message.chat.id,
+                message_id=cart_message_id,
+            )
+        except TelegramBadRequest:
+            pass
     else:
         await query.bot.edit_message_reply_markup(
             business_connection_id=query.message.business_connection_id,
